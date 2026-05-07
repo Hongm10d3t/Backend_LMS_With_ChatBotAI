@@ -7,6 +7,7 @@ const configViewEngine = require("./config/viewEngine");
 const connectDB = require("./config/database");
 const webRoutes = require("./routes/web");
 const apiRoutes = require("./routes/api");
+const path = require("path");
 const cors = require("cors");
 
 const app = express();
@@ -16,7 +17,8 @@ const HOST = process.env.HOST_NAME || "localhost";
 
 // config  fileUpload
 app.use(fileUpload());
-
+app.use("/images/upload", express.static(path.resolve(__dirname, "public/images/upload")));
+app.use("/file/document", express.static(path.resolve(__dirname, "public/file/document")));
 // body parsing (Express đã có sẵn)
 // có tác dụng convert data về dạng object để xử lí trên code
 app.use(express.json());

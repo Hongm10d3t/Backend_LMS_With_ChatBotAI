@@ -9,7 +9,9 @@ const questionBankController = require('../../controllers/api/questionbankContro
 const examController = require('../../controllers/api/examApiController');
 const examAttemptController = require('../../controllers/api/examAttemptController');
 const announcementController = require("../../controllers/api/announcementApiController");
+const messageApiController = require("../../controllers/api/messageApiController");
 const { requireRole } = require('../../middleware/authMiddlewareApi');
+
 // const uploadCsv = require('../../middleware/uploadCsv');
 // Add middleware
 routerAPI.use(requireRole("TEACHER"));
@@ -61,5 +63,9 @@ routerAPI.get(
     "/course/:courseId/student/:studentId/exam/:examId/attempts",
     examAttemptController.getStudentExamAttemptsByExamForTeacher
 );
+
+// chat lớp học
+routerAPI.get("/course/:courseId/messages", messageApiController.getCourseMessages);
+routerAPI.post("/course/:courseId/message", messageApiController.postCreateMessage);
 
 module.exports = routerAPI;

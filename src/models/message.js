@@ -7,6 +7,7 @@ const messageSchema = new mongoose.Schema(
             ref: "Course",
             required: true,
         },
+
         senderId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
@@ -18,12 +19,14 @@ const messageSchema = new mongoose.Schema(
             default: "",
             trim: true,
         },
+
         type: {
             type: String,
-            enum: ["text", "file"],
+            enum: ["text", "image"],
             default: "text",
         },
-        fileUrl: {
+
+        imageUrl: {
             type: String,
             default: "",
             trim: true,
@@ -37,4 +40,5 @@ const messageSchema = new mongoose.Schema(
 messageSchema.index({ courseId: 1, createdAt: 1 });
 messageSchema.index({ senderId: 1, createdAt: -1 });
 
-module.exports = mongoose.models.Message || mongoose.model("Message", messageSchema);
+module.exports =
+    mongoose.models.Message || mongoose.model("Message", messageSchema);

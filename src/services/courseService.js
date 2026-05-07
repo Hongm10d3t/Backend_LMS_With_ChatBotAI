@@ -212,7 +212,7 @@ const deleteTeacherService = async (courseId, teacherId) => {
     }
 }
 const getMyCourseService = async (userId, role, termId) => {
-    console.log(">>>>>", userId, role);
+    // console.log(">>>>>", userId, role);
     try {
         let courses = [];
         if (role === "STUDENT") {

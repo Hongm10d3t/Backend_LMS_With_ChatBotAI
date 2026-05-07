@@ -10,6 +10,7 @@ const examController = require('../../controllers/api/examApiController');
 const examAttemptController = require('../../controllers/api/examAttemptController');
 const { requireRole } = require('../../middleware/authMiddlewareApi');
 const announcementController = require("../../controllers/api/announcementApiController");
+const messageApiController = require("../../controllers/api/messageApiController");
 
 routerAPI.use(requireRole("STUDENT"));
 // lấy ra tất cả kì học được join
@@ -58,5 +59,7 @@ routerAPI.patch('/examAttempt/:examAttemptId/note/:noteId', examAttemptControlle
 
 // xóa note
 routerAPI.delete('/examAttempt/:examAttemptId/note/:noteId', examAttemptController.deleteAttemptNote);
-
+// chat lớp học
+routerAPI.get("/course/:courseId/messages", messageApiController.getCourseMessages);
+routerAPI.post("/course/:courseId/message", messageApiController.postCreateMessage);
 module.exports = routerAPI;

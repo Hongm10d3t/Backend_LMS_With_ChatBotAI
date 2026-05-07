@@ -13,6 +13,9 @@ const createRandomExam = async ({
     startAt,
     endAt,
 }) => {
+    console.log(">>>>>>", startAt);
+    console.log(">>>>>", endAt);
+
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
         return {
             EC: 1,
@@ -46,6 +49,14 @@ const createRandomExam = async ({
         return {
             EC: 1,
             EM: "Ngân hàng đề không thuộc môn học này",
+            DT: null,
+            status: 400,
+        };
+    }
+    if (startAt > endAt) {
+        return {
+            EC: 1,
+            EM: "Thời gian bắt đầu vượt quá thời gian kết thúc",
             DT: null,
             status: 400,
         };
