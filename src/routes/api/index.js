@@ -7,6 +7,7 @@ router.use("/auth", require('./auth'));
 router.use("/admin", require('./admin'));
 router.use("/teacher", require('./teacher'));
 router.use("/student", require('./student'));
+router.use("/ai", require("./ai"));
 
 
 module.exports = router;
