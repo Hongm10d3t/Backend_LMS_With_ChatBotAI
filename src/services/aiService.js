@@ -1,4 +1,5 @@
 const OpenAI = require("openai");
+const { toFile } = require("openai/uploads");
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
@@ -30,20 +31,25 @@ Phạm vi hỗ trợ:
 - Giải thích các vấn đề học tập phổ biến của sinh viên.
 - Hỗ trợ câu hỏi liên quan đến học tập của sinh viên PTIT nếu có tài liệu cung cấp.
 
+4. Hỗ trợ file và ảnh người dùng gửi lên:
+- Có thể đọc, tóm tắt, giải thích, phân tích nội dung file hoặc ảnh.
+- Có thể tạo dàn ý, câu hỏi ôn tập, flashcard, ý chính từ tài liệu người dùng gửi.
+- Nếu người dùng hỏi tiếp về file/ảnh trong cùng cuộc trò chuyện, hãy tiếp tục dựa trên file/ảnh đã được cung cấp trong cuộc trò chuyện.
+
 Nguyên tắc trả lời:
 - Luôn trả lời bằng tiếng Việt.
 - Trả lời ngắn gọn, rõ ràng, dễ hiểu.
 - Ưu tiên trả lời theo vai trò hiện tại của người dùng.
 - Nếu câu hỏi liên quan đến quy định, môn học, tài liệu chính thức của PTIT nhưng tài liệu không có thông tin, hãy nói rõ: "Hiện tại tôi chưa có đủ tài liệu để trả lời chính xác."
+- Nếu câu hỏi liên quan đến file/ảnh nhưng file/ảnh không đủ thông tin, hãy nói rõ: "Tôi chưa thấy đủ thông tin trong file/ảnh để trả lời chính xác."
 - Không tự bịa thông tin chính thức của nhà trường.
 - Không bịa điểm số, lớp học, bài thi, tài khoản hoặc dữ liệu cá nhân nếu backend không cung cấp.
+- Không tự truy vấn hoặc suy đoán dữ liệu trong database hệ thống khi backend không cung cấp.
 - Nếu người dùng hỏi ngoài phạm vi học tập/hệ thống, hãy lịch sự nói rằng bạn chủ yếu hỗ trợ các vấn đề liên quan đến hệ thống LMS và học tập.
 `;
 
 const buildUserContext = (user) => {
-    if (!user) {
-        return "Người dùng hiện tại chưa xác định.";
-    }
+    if (!user) return "Người dùng hiện tại chưa xác định.";
 
     return `
 Thông tin người dùng đang đăng nhập:
@@ -54,17 +60,96 @@ Thông tin người dùng đang đăng nhập:
 `;
 };
 
-const normalizeMessages = (messages = []) => {
+const getAttachmentKind = (mimeType = "") => {
+    return mimeType.startsWith("image/") ? "image" : "file";
+};
+
+const isSupportedMimeType = (mimeType = "") => {
+    const allowedMimeTypes = [
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/webp",
+        "image/gif",
+        "application/pdf",
+        "text/plain",
+        "text/markdown",
+        "text/csv",
+        "application/json",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ];
+
+    return allowedMimeTypes.includes(mimeType);
+};
+
+const uploadToOpenAI = async (uploadedFile) => {
+    if (!uploadedFile) {
+        throw new Error("File không hợp lệ");
+    }
+
+    if (!isSupportedMimeType(uploadedFile.mimetype)) {
+        throw new Error(`Định dạng file không được hỗ trợ: ${uploadedFile.mimetype}`);
+    }
+
+    const kind = getAttachmentKind(uploadedFile.mimetype);
+
+    const openaiFile = await openai.files.create({
+        file: await toFile(uploadedFile.data, uploadedFile.name),
+        purpose: kind === "image" ? "vision" : "user_data",
+    });
+
+    return {
+        openaiFileId: openaiFile.id,
+        originalName: uploadedFile.name,
+        mimeType: uploadedFile.mimetype,
+        size: uploadedFile.size || uploadedFile.data?.length || 0,
+        kind,
+    };
+};
+
+const buildUserContent = ({ message, attachments = [] }) => {
+    const content = [
+        {
+            type: "input_text",
+            text: message && message.trim()
+                ? message.trim()
+                : "Hãy phân tích nội dung file/ảnh tôi gửi.",
+        },
+    ];
+
+    for (const attachment of attachments) {
+        if (attachment.kind === "image") {
+            content.push({
+                type: "input_image",
+                file_id: attachment.openaiFileId,
+            });
+        } else {
+            content.push({
+                type: "input_file",
+                file_id: attachment.openaiFileId,
+            });
+        }
+    }
+
+    return content;
+};
+
+const normalizeConversationHistory = (messages = []) => {
     return messages
+        .slice(-12)
         .filter((msg) => msg && msg.content)
-        .slice(-10)
         .map((msg) => ({
             role: msg.role === "assistant" ? "assistant" : "user",
             content: String(msg.content).slice(0, 3000),
         }));
 };
 
-const chatWithAI = async ({ user, messages }) => {
+const chatWithAI = async ({ user, conversationMessages = [], message = "", attachments = [] }) => {
     if (!process.env.OPENAI_API_KEY) {
         throw new Error("Missing OPENAI_API_KEY");
     }
@@ -77,7 +162,11 @@ const chatWithAI = async ({ user, messages }) => {
             role: "developer",
             content: `${LMS_SYSTEM_PROMPT}\n\n${buildUserContext(user)}`,
         },
-        ...normalizeMessages(messages),
+        ...normalizeConversationHistory(conversationMessages),
+        {
+            role: "user",
+            content: buildUserContent({ message, attachments }),
+        },
     ];
 
     const payload = {
@@ -104,4 +193,5 @@ const chatWithAI = async ({ user, messages }) => {
 
 module.exports = {
     chatWithAI,
+    uploadToOpenAI,
 };
